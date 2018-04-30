@@ -1,5 +1,8 @@
 # fricgan - A simple (byte based) crate
 
+[![Build Status](https://travis-ci.org/awstanley/fricgan.svg?branch=master)](https://travis-ci.org/awstanley/fricgan)
+[![Build status](https://ci.appveyor.com/api/projects/status/5kqunyhlyoe4mvv6/branch/master?svg=true)](https://ci.appveyor.com/project/awstanley/fricgan/branch/master)
+
 fricgan is a byte manipulation crate, which targets common operations used in both std and core-only work.
 
 It is being released mostly because I've written this code dozens of times for different little projects, but never previous put it all together before.  Hopefully this addresses people asking how/why things work in certain ways.
