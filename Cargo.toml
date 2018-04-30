@@ -1,12 +1,18 @@
 [package]
 name = "fricgan"
-version = "0.0.2"
+version = "0.1.0"
 authors = ["A.W. 'aws' Stanley <aws@reversing.space>"]
 description = "A simple crate for performing basic input and output on bytes."
 repository = "https://github.com/awstanley/fricgan"
+homepage = "https://github.com/awstanley/fricgan"
+documentation = "https://docs.rs/fricgan/"
 readme = "README.md"
 categories = ["data-structures","no-std"]
 license = "MIT OR Apache-2.0"
+
+[badges]
+appveyor = { repository = "awstanley/fricgan" }
+travis-ci = { repository = "awstanley/fricgan" }
 
 [dependencies.num-traits]
 version = "0.2"
@@ -14,27 +20,16 @@ default-features = false
 optional = true
 
 [features]
-default = [
-    "io-i8",
-    "io-i16",
-    "io-i32",
-    "io-i64",
+default = []
 
-    "io-u8",
-    "io-u16",
-    "io-u32",
-    "io-u64",
-
-    "vlq",
-    "vlq-32",
-    "vlq-64",
-
-    "safety-checks",
-]
-
-# Safety
+# asserts for bad fio_read and fio_write.
+# Used to keep the unsafe version somewhat safe.
 safety-checks = []
 
+# Unsafe enables copy_nonoverlapping
+unsafe = []
+
+# std enables std usage (required for strings)
 std = []
 
 # i8 (single signed byte) read/write.
@@ -60,6 +55,12 @@ io-u32 = []
 
 # u64 (eight unsigned bytes) read/write.
 io-u64 = []
+
+# f32
+io-f32 = []
+
+# f64
+io-f64 = []
 
 # u8 length with a string that follows.
 io-string = ["std", "num-traits", "num-traits/std"]

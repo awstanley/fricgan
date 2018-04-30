@@ -18,8 +18,39 @@ extern crate core;
 #[cfg(test)]
 extern crate tempdir;
 
+#[cfg(
+    any(
+        feature="io-i8",
+        feature="io-u8",
+        feature="io-i16",
+        feature="io-u16",
+        feature="io-f32",
+        feature="io-i32",
+        feature="io-u32",
+        feature="io-f64",
+        feature="io-i64",
+        feature="io-u64",
+    )
+)]
 use core::mem::size_of;
+
+#[cfg(
+    any(
+        feature="io-i8",
+        feature="io-u8",
+        feature="io-i16",
+        feature="io-u16",
+        feature="io-f32",
+        feature="io-i32",
+        feature="io-u32",
+        feature="io-f64",
+        feature="io-i64",
+        feature="io-u64",
+    )
+)]
 use core::slice::from_raw_parts_mut;
+
+#[cfg(feature="unsafe")]
 use core::ptr;
 
 #[cfg(feature="std")]
@@ -65,7 +96,41 @@ pub trait IO {
 }
 
 // [u8] implementation reduces the overall complexity of the below,
+// and centralises the safety check.  This block is the safer, slower,
+// version, that's designed to keep people happy.
+#[cfg(not(feature="unsafe"))]
+impl IO for [u8] {
+    fn fio_write(&mut self, sink: &mut [u8]) -> usize {
+        #[cfg(feature="safety-checks")]
+        assert!(self.len() <= sink.len());
+
+        for i in 0..self.len() {
+            sink[i] = self[i];
+        }
+
+        self.len()
+    }
+
+    fn fio_read(&mut self, source: &[u8]) -> usize {
+        #[cfg(feature="safety-checks")]
+        assert!(self.len() <= source.len());
+
+        for i in 0..self.len() {
+            self[i] = source[i];
+        }
+
+        self.len()
+    }
+}
+
+
+// [u8] implementation reduces the overall complexity of the below,
 // and centralises the safety check.
+//
+// This is the unsafe/faster implementation.  It still won't fail unless
+// you pass in things of the wrong size (at which point safety-checks
+// picks up on it if that's enabled).
+#[cfg(feature="unsafe")]
 impl IO for [u8] {
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
         #[cfg(feature="safety-checks")]
@@ -348,6 +413,52 @@ fn test_io_i32() {
     assert_eq!(data[3], data[7]);
 }
 
+#[cfg(feature="io-f32")]
+impl IO for f32 {
+    fn fio_read(&mut self, source: &[u8]) -> usize {
+        let me: &mut [u8] = unsafe {
+            from_raw_parts_mut(
+                self as *mut Self as *mut u8,
+                size_of::<Self>()
+            )
+        };
+        me.fio_read(source)
+    }
+
+    fn fio_write(&mut self, sink: &mut [u8]) -> usize {
+        let me: &mut [u8] = unsafe {
+            from_raw_parts_mut(
+                self as *mut Self as *mut u8,
+                size_of::<Self>()
+            )
+        };
+        me.fio_write(sink)
+    }
+}
+
+
+#[cfg(feature="io-f32")]
+#[test]
+fn test_io_f32() {
+    let mut data: [u8; 8] = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    ];
+    let mut test: f32 = 381.5476213f32;
+    let mut test2 : f32 = 0.0f32;
+
+    // Paranoia is fun
+    assert_ne!(test, test2);
+
+    // write
+    assert_eq!(test.fio_write(&mut data[..]), 4);
+    assert_ne!(test, test2);
+
+    // read back
+    assert_eq!(test2.fio_read(&data[..]), 4);
+    assert_eq!(test, test2);
+}
+
+
 #[cfg(feature="io-u64")]
 impl IO for u64 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
@@ -484,6 +595,51 @@ fn test_io_i64() {
     assert_eq!(data[5], data[13]);
     assert_eq!(data[6], data[14]);
     assert_eq!(data[7], data[15]);
+}
+
+#[cfg(feature="io-f64")]
+impl IO for f64 {
+    fn fio_read(&mut self, source: &[u8]) -> usize {
+        let me: &mut [u8] = unsafe {
+            from_raw_parts_mut(
+                self as *mut Self as *mut u8,
+                size_of::<Self>()
+            )
+        };
+        me.fio_read(source)
+    }
+
+    fn fio_write(&mut self, sink: &mut [u8]) -> usize {
+        let me: &mut [u8] = unsafe {
+            from_raw_parts_mut(
+                self as *mut Self as *mut u8,
+                size_of::<Self>()
+            )
+        };
+        me.fio_write(sink)
+    }
+}
+
+#[cfg(feature="io-f64")]
+#[test]
+fn test_io_f64() {
+    let mut data: [u8; 8] = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    ];
+
+    let mut test: f64 = 381.5476213f64;
+    let mut test2 : f64 = 0.0f64;
+
+    // Paranoia is fun
+    assert_ne!(test, test2);
+
+    // write
+    assert_eq!(test.fio_write(&mut data[..]), 8);
+    assert_ne!(test, test2);
+
+    // read back
+    assert_eq!(test2.fio_read(&data[..]), 8);
+    assert_eq!(test, test2);
 }
 
 // ----------------------------------------------------------------------
@@ -718,12 +874,13 @@ impl FricganString for String {
     where V: ToPrimitive + FromPrimitive + Unsigned + IO {
         let mut length: V = V::from_usize(0).unwrap();
         let mut read = length.fio_read(source);
-        self.reserve_exact(V::to_usize(&length).unwrap());
+        let length_usize : usize = V::to_usize(&length).unwrap();
+        self.reserve_exact(length_usize);
         read += unsafe {
             let vv: &mut Vec<u8> = self.as_mut_vec();
-            vv.set_len(ToPrimitive::to_usize(&length).unwrap());
+            vv.set_len(length_usize);
             let v: &mut [u8] = vv.as_mut_slice();
-            v.fio_read(source)
+            v.fio_read(&source[size_of::<V>()..])
         };
         read
     }
@@ -732,10 +889,51 @@ impl FricganString for String {
     where V: ToPrimitive + FromPrimitive + Unsigned + IO {
         let mut length: V = V::from_usize(self.len()).unwrap();
         let mut written = length.fio_write(sink);
-        let v: &mut [u8] = unsafe { self.as_bytes_mut() };
-        written += sink.fio_write(v);
+        let length_usize : usize = V::to_usize(&length).unwrap();
+        written += unsafe {
+            let vv: &mut Vec<u8> = self.as_mut_vec();
+            vv.set_len(length_usize);
+            let v: &mut [u8] = vv.as_mut_slice();
+            v.fio_write(&mut sink[size_of::<V>()..])
+        };
         written
     }
+}
+
+#[cfg(all(feature="io-string",feature="io-u32"))]
+#[test]
+fn test_io_string() {
+
+    let mut a = "This is a sample string to be written out and then restored"
+        .to_owned();
+
+    let mut b : String = "".to_owned();
+
+    let mut _v = Vec::<u8>::with_capacity(a.len() + 4);
+    unsafe {
+        _v.set_len(a.len() + 4);
+    }
+    let v = _v.as_mut_slice();
+    println!("a len: {}", a.len());
+    println!("b len: {}", b.len());
+    println!("v len: {}", v.len());
+    
+    let mut l = a.fio_string_write::<u32>(&mut v[..]);
+
+    assert_eq!(l, a.len() + 4);
+
+    for i in 0..a.len() {
+        assert_eq!(a.as_bytes()[i], v[i+4]);
+    }
+
+    l = b.fio_string_read::<u32>(&v[..]);
+    assert_eq!(l, a.len() + 4);
+
+    for i in 0..b.len() {
+        assert_eq!(b.as_bytes()[i], v[i+4]);
+    }
+
+    println!("a: {}\nb: {}", a.as_str(), b.as_str());
 }
 
 // ----------------------------------------------------------------------
@@ -772,12 +970,13 @@ impl VLQString for String {
     where V: ToPrimitive + FromPrimitive + Unsigned + VLQ {
         let mut length: V = V::from_usize(0).unwrap();
         let mut read = length.vlq_read(source);
-        self.reserve_exact(V::to_usize(&length).unwrap());
+        let length_usize : usize = read;
+        self.reserve_exact(length_usize);
         read += unsafe {
             let vv: &mut Vec<u8> = self.as_mut_vec();
-            vv.set_len(ToPrimitive::to_usize(&length).unwrap());
+            vv.set_len(length_usize);
             let v: &mut [u8] = vv.as_mut_slice();
-            v.fio_read(source)
+            v.fio_read(&source[length_usize..])
         };
         read
     }
@@ -786,8 +985,58 @@ impl VLQString for String {
     where V: ToPrimitive + FromPrimitive + Unsigned + VLQ {
         let length: V = V::from_usize(self.len()).unwrap();
         let mut written = length.vlq_write(sink);
-        let v: &mut [u8] = unsafe { self.as_bytes_mut() };
-        written += sink.fio_write(v);
+        let length_usize : usize = written;
+        written += unsafe {
+            let vv: &mut Vec<u8> = self.as_mut_vec();
+            vv.set_len(length_usize);
+            let v: &mut [u8] = vv.as_mut_slice();
+            v.fio_write(&mut sink[length_usize..])
+        };
         written
     }
+}
+
+#[cfg(all(feature="vlq-string",feature="vlq-32"))]
+#[test]
+fn test_vlq_string() {
+
+    let mut a = "This is a sample string to be written out and then restored"
+        .to_owned();
+
+    let mut b : String = "".to_owned();
+
+    let mut _v = Vec::<u8>::with_capacity(a.len() + 4);
+    unsafe {
+        _v.set_len(a.len() + 4);
+    }
+    let v = _v.as_mut_slice();
+    println!("a len: {}", a.len());
+    println!("b len: {}", b.len());
+    println!("v len: {}", v.len());
+    
+    let mut l = a.vlq_string_write::<u32>(&mut v[..]);
+
+    // Offset is unknown because it's VLQ (not so much in a test,
+    // but the point remains here that the only test variable should
+    // be the random string above)
+    let mut u : u32 = 0;
+    u.vlq_read(&v[..]);
+
+    // o is for offset.
+    let o = usize::from_u32(0).unwrap();
+
+    assert_eq!(l, a.len() + o);
+
+    for i in 0..a.len() {
+        assert_eq!(a.as_bytes()[i], v[i+o]);
+    }
+
+    l = b.vlq_string_read::<u32>(&v[..]);
+    assert_eq!(l, a.len() + o);
+
+    for i in 0..b.len() {
+        assert_eq!(b.as_bytes()[i], v[i+o]);
+    }
+
+    println!("a: {}\nb: {}", a.as_str(), b.as_str());
 }
