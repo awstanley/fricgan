@@ -9,6 +9,10 @@ documentation = "https://docs.rs/fricgan/"
 readme = "README.md"
 categories = ["data-structures","no-std"]
 license = "MIT OR Apache-2.0"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
 
 [badges]
 appveyor = { repository = "awstanley/fricgan" }
