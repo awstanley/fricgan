@@ -2,7 +2,7 @@
 //! requiring std.  It has additional features (where `std` is enabled), but
 //! the core feature set is designed to provide the minimal types and support
 //! for cross-language IO work.
-//! 
+//!
 //! At this time it does not implement byte order manipulation, as the std
 //! primitives for the integral types support `swap_bytes`, `{to,from}_be`,
 //! and `{to,from}_le`.  (If you are implementing without std then presumably
@@ -10,32 +10,30 @@
 //! this library up).
 
 #![warn(missing_docs)]
+#![cfg_attr(not(feature="std"), no_std)] 
 
-// No standard library (unless requested)
-#![cfg_attr(not(feature = "std"), no_std)]
-
-#[cfg(feature = "std")]
+#[cfg(feature="std")]
 extern crate core;
 
 #[cfg(test)]
 extern crate tempdir;
 
 use core::mem::size_of;
-use core::slice::{from_raw_parts_mut};
+use core::slice::from_raw_parts_mut;
 use core::ptr;
 
-#[cfg(feature = "std")]
+#[cfg(feature="std")]
 use std::io::Read as StandardRead;
 
-#[cfg(feature = "std")]
+#[cfg(feature="std")]
 use std::io::Write as StandardWrite;
 
 
-#[cfg(feature = "num-traits")]
+#[cfg(feature="num-traits")]
 extern crate num_traits;
 
-#[cfg(feature = "num-traits")]
-use num_traits::{cast::{ToPrimitive, FromPrimitive}, sign::Unsigned};
+#[cfg(feature="num-traits")]
+use num_traits::{cast::{FromPrimitive, ToPrimitive}, sign::Unsigned};
 
 // ----------------------------------------------------------------------
 // IO (and IO implementations)
@@ -45,32 +43,32 @@ use num_traits::{cast::{ToPrimitive, FromPrimitive}, sign::Unsigned};
 /// designed to be fancy, it's just designed to be fast.  There is
 /// likely room for improvement, but for now the implementations
 /// work and provide fairly great speed.
-/// 
+///
 /// The prefix `fio` is for fricgan-input-output, and is used to
 /// prevent name collisions.
 pub trait IO {
     /// Writes bytes to a byte buffer.
     /// `self` is mutable because certain types need to step the
     /// internal index/offset value.
-    /// 
+    ///
     /// This shall write to offset zero (`0`).
-    /// 
+    ///
     /// The return value shall always be the number of bytes written.
-    fn fio_write(&mut self, sink : &mut [u8]) -> usize;
+    fn fio_write(&mut self, sink: &mut [u8]) -> usize;
 
     /// Reads bytes to a byte buffer.
-    /// 
+    ///
     /// This shall read from offset zero (`0`).
-    /// 
+    ///
     /// The return value shall always be the number of bytes read.
-    fn fio_read(&mut self, source : &[u8]) -> usize;
+    fn fio_read(&mut self, source: &[u8]) -> usize;
 }
 
 // [u8] implementation reduces the overall complexity of the below,
 // and centralises the safety check.
 impl IO for [u8] {
-    fn fio_write(&mut self, sink : &mut [u8]) -> usize {
-        #[cfg(feature = "safety-checks")]
+    fn fio_write(&mut self, sink: &mut [u8]) -> usize {
+        #[cfg(feature="safety-checks")]
         assert!(self.len() <= sink.len());
 
         unsafe {
@@ -80,7 +78,7 @@ impl IO for [u8] {
     }
 
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        #[cfg(feature = "safety-checks")]
+        #[cfg(feature="safety-checks")]
         assert!(self.len() <= source.len());
 
         unsafe {
@@ -89,7 +87,6 @@ impl IO for [u8] {
         self.len()
     }
 }
-
 
 #[cfg(feature="io-u8")]
 impl IO for u8 {
@@ -107,8 +104,8 @@ impl IO for u8 {
 #[cfg(feature="io-u8")]
 #[test]
 fn test_io_u8() {
-    let mut data : [u8; 4] = [0,1,2,3];
-    let mut test : u8 = 5u8;
+    let mut data: [u8; 4] = [0,1,2,3];
+    let mut test: u8 = 5u8;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 1);
@@ -143,8 +140,8 @@ impl IO for i8 {
 #[cfg(feature="io-i8")]
 #[test]
 fn test_io_i8() {
-    let mut data : [u8; 4] = [0,1,2,3];
-    let mut test : i8 = 5i8;
+    let mut data: [u8; 4] = [0,1,2,3];
+    let mut test: i8 = 5i8;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 1);
@@ -166,7 +163,7 @@ fn test_io_i8() {
 #[cfg(feature="io-u16")]
 impl IO for u16 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -176,7 +173,7 @@ impl IO for u16 {
     }
 
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -189,8 +186,8 @@ impl IO for u16 {
 #[cfg(feature="io-u16")]
 #[test]
 fn test_io_u16() {
-    let mut data : [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    let mut test : u16 = 0x7654u16;
+    let mut data: [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut test: u16 = 0x7654u16;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 2);
@@ -208,7 +205,7 @@ fn test_io_u16() {
 #[cfg(feature="io-i16")]
 impl IO for i16 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -218,7 +215,7 @@ impl IO for i16 {
     }
 
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -231,8 +228,8 @@ impl IO for i16 {
 #[cfg(feature="io-i16")]
 #[test]
 fn test_io_i16() {
-    let mut data : [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    let mut test : i16 = 0x7654i16;
+    let mut data: [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut test: i16 = 0x7654i16;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 2);
@@ -250,7 +247,7 @@ fn test_io_i16() {
 #[cfg(feature="io-u32")]
 impl IO for u32 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -260,7 +257,7 @@ impl IO for u32 {
     }
 
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -273,8 +270,8 @@ impl IO for u32 {
 #[cfg(feature="io-u32")]
 #[test]
 fn test_io_u32() {
-    let mut data : [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    let mut test : u32 = 0x76543210u32;
+    let mut data: [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut test: u32 = 0x76543210u32;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 4);
@@ -302,7 +299,7 @@ fn test_io_u32() {
 #[cfg(feature="io-i32")]
 impl IO for i32 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -312,7 +309,7 @@ impl IO for i32 {
     }
 
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -325,8 +322,8 @@ impl IO for i32 {
 #[cfg(feature="io-i32")]
 #[test]
 fn test_io_i32() {
-    let mut data : [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    let mut test : i32 = 0x76543210i32;
+    let mut data: [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut test: i32 = 0x76543210i32;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 4);
@@ -354,7 +351,7 @@ fn test_io_i32() {
 #[cfg(feature="io-u64")]
 impl IO for u64 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -364,7 +361,7 @@ impl IO for u64 {
     }
 
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -377,11 +374,11 @@ impl IO for u64 {
 #[cfg(feature="io-u64")]
 #[test]
 fn test_io_u64() {
-    let mut data : [u8; 16] = [
+    let mut data: [u8; 16] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
     ];
-    let mut test : u64 = 0x7654321076543210u64;
+    let mut test: u64 = 0x7654321076543210u64;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 8);
@@ -423,7 +420,7 @@ fn test_io_u64() {
 #[cfg(feature="io-i64")]
 impl IO for i64 {
     fn fio_read(&mut self, source: &[u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -433,7 +430,7 @@ impl IO for i64 {
     }
 
     fn fio_write(&mut self, sink: &mut [u8]) -> usize {
-        let me : &mut [u8] = unsafe {
+        let me: &mut [u8] = unsafe {
             from_raw_parts_mut(
                 self as *mut Self as *mut u8,
                 size_of::<Self>()
@@ -446,11 +443,11 @@ impl IO for i64 {
 #[cfg(feature="io-i64")]
 #[test]
 fn test_io_i64() {
-    let mut data : [u8; 16] = [
+    let mut data: [u8; 16] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
     ];
-    let mut test : i64 = 0x7654321076543210i64;
+    let mut test: i64 = 0x7654321076543210i64;
 
     // read
     assert_eq!(test.fio_read(&data[..]), 8);
@@ -494,9 +491,9 @@ fn test_io_i64() {
 // ----------------------------------------------------------------------
 
 /// Perform a std::io::Read operation on a fio typed value.
-#[cfg(feature = "std")]
-pub fn fio_read<T: IO + Sized, R: StandardRead>(object : &mut T, source: &mut R) -> usize {
-    let obj : &mut [u8] = unsafe {
+#[cfg(feature="std")]
+pub fn fio_read<T: IO + Sized, R: StandardRead>(object: &mut T, source: &mut R) -> usize {
+    let obj: &mut [u8] = unsafe {
         from_raw_parts_mut(
             object as *mut T as *mut u8,
             size_of::<T>()
@@ -508,9 +505,9 @@ pub fn fio_read<T: IO + Sized, R: StandardRead>(object : &mut T, source: &mut R)
 }
 
 /// Performs a std::io::Write operation on a fio typed value.
-#[cfg(feature = "std")]
-pub fn fio_write<T: IO + Sized, W: StandardWrite>(object : &mut T, sink: &mut W) -> usize {
-    let obj : &mut [u8] = unsafe {
+#[cfg(feature="std")]
+pub fn fio_write<T: IO + Sized, W: StandardWrite>(object: &mut T, sink: &mut W) -> usize {
+    let obj: &mut [u8] = unsafe {
         from_raw_parts_mut(
             object as *mut T as *mut u8,
             size_of::<T>()
@@ -539,8 +536,8 @@ fn test_read_write_i32() {
         .write(true)
         .open(file_path).unwrap();
 
-    let data : [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
-    let mut test : i32 = 0;
+    let data: [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let mut test: i32 = 0;
 
     // Pull four bytes
     assert_eq!(test.fio_read(&data[..]), 4);
@@ -608,30 +605,30 @@ fn test_read_write_i32() {
 
 /// VLQ is Variable Length Quantity, which, in this context, provides
 /// vlq read/write values to the underlying value.
-#[cfg(feature = "vlq")]
+#[cfg(feature="vlq")]
 pub trait VLQ {
     /// Writes bytes to a byte buffer.
     /// This shall write to offset zero (`0`).
     /// 
     /// The return value shall always be the number of bytes written.
-    fn vlq_write(&self, sink : &mut [u8]) -> usize;
+    fn vlq_write(&self, sink: &mut [u8]) -> usize;
 
     /// Reads bytes to a byte buffer.
     /// 
     /// This shall read from offset zero (`0`).
     /// 
     /// The return value shall always be the number of bytes read.
-    fn vlq_read(&mut self, source : &[u8]) -> usize;
+    fn vlq_read(&mut self, source: &[u8]) -> usize;
 }
 
-#[cfg(feature = "vlq-32")]
+#[cfg(feature="vlq-32")]
 impl VLQ for u32 {
     fn vlq_read(&mut self, source: &[u8]) -> usize {
         *self = 0;
-        let mut bits : usize = 0;
-        let mut i : usize = 0;
+        let mut bits: usize = 0;
+        let mut i: usize = 0;
         while bits != 35 {
-            let b : u8 = source[i];
+            let b: u8 = source[i];
             *self += ((b & 127) as Self) << bits;
             bits += 7;
             if (b & 128) == 0 {
@@ -644,27 +641,27 @@ impl VLQ for u32 {
 
     fn vlq_write(&self, sink: &mut [u8]) -> usize {
         let mut remainder = *self;
-        let mut i : usize = 0;
+        let mut i: usize = 0;
         while remainder >= 128 {
-            let b : u8 = remainder as u8 | 128;
+            let b: u8 = remainder as u8 | 128;
             sink[i] = b;
             remainder = remainder >> 7;
             i += 1;
         }
-        let b : u8 = remainder as u8;
+        let b: u8 = remainder as u8;
         sink[i] = b;
         i
     }
 }
 
-#[cfg(feature = "vlq-64")]
+#[cfg(feature="vlq-64")]
 impl VLQ for u64 {
     fn vlq_read(&mut self, source: &[u8]) -> usize {
         *self = 0;
-        let mut bits : usize = 0;
-        let mut i : usize = 0;
+        let mut bits: usize = 0;
+        let mut i: usize = 0;
         while bits != 71 {
-            let b : u8 = source[i];
+            let b: u8 = source[i];
             *self += ((b & 127) as Self) << bits;
             bits += 7;
             if (b & 128) == 0 {
@@ -677,14 +674,14 @@ impl VLQ for u64 {
 
     fn vlq_write(&self, sink: &mut [u8]) -> usize {
         let mut remainder = *self;
-        let mut i : usize = 0;
+        let mut i: usize = 0;
         while remainder >= 128 {
-            let b : u8 = remainder as u8 | 128;
+            let b: u8 = remainder as u8 | 128;
             sink[i] = b;
             remainder = remainder >> 7;
             i += 1;
         }
-        let b : u8 = remainder as u8;
+        let b: u8 = remainder as u8;
         sink[i] = b;
         i
     }
@@ -719,13 +716,13 @@ pub trait FricganString {
 impl FricganString for String {
     fn fio_string_read<V>(&mut self, source: &[u8]) -> usize
     where V: ToPrimitive + FromPrimitive + Unsigned + IO {
-        let mut length : V = V::from_usize(0).unwrap();
+        let mut length: V = V::from_usize(0).unwrap();
         let mut read = length.fio_read(source);
         self.reserve_exact(V::to_usize(&length).unwrap());
         read += unsafe {
-            let vv : &mut Vec<u8> = self.as_mut_vec();
+            let vv: &mut Vec<u8> = self.as_mut_vec();
             vv.set_len(ToPrimitive::to_usize(&length).unwrap());
-            let v : &mut [u8] = vv.as_mut_slice();
+            let v: &mut [u8] = vv.as_mut_slice();
             v.fio_read(source)
         };
         read
@@ -733,7 +730,7 @@ impl FricganString for String {
 
     fn fio_string_write<V>(&mut self, sink: &mut [u8]) -> usize
     where V: ToPrimitive + FromPrimitive + Unsigned + IO {
-        let mut length : V = V::from_usize(self.len()).unwrap();
+        let mut length: V = V::from_usize(self.len()).unwrap();
         let mut written = length.fio_write(sink);
         let v: &mut [u8] = unsafe { self.as_bytes_mut() };
         written += sink.fio_write(v);
@@ -773,13 +770,13 @@ pub trait VLQString {
 impl VLQString for String {
     fn vlq_string_read<V>(&mut self, source: &[u8]) -> usize
     where V: ToPrimitive + FromPrimitive + Unsigned + VLQ {
-        let mut length : V = V::from_usize(0).unwrap();
+        let mut length: V = V::from_usize(0).unwrap();
         let mut read = length.vlq_read(source);
         self.reserve_exact(V::to_usize(&length).unwrap());
         read += unsafe {
-            let vv : &mut Vec<u8> = self.as_mut_vec();
+            let vv: &mut Vec<u8> = self.as_mut_vec();
             vv.set_len(ToPrimitive::to_usize(&length).unwrap());
-            let v : &mut [u8] = vv.as_mut_slice();
+            let v: &mut [u8] = vv.as_mut_slice();
             v.fio_read(source)
         };
         read
@@ -787,7 +784,7 @@ impl VLQString for String {
 
     fn vlq_string_write<V>(&mut self, sink: &mut [u8]) -> usize
     where V: ToPrimitive + FromPrimitive + Unsigned + VLQ {
-        let length : V = V::from_usize(self.len()).unwrap();
+        let length: V = V::from_usize(self.len()).unwrap();
         let mut written = length.vlq_write(sink);
         let v: &mut [u8] = unsafe { self.as_bytes_mut() };
         written += sink.fio_write(v);

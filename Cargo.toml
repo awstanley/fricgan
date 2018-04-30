@@ -1,9 +1,9 @@
 [package]
 name = "fricgan"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["A.W. 'aws' Stanley <aws@reversing.space>"]
 description = "A simple crate for performing basic input and output on bytes."
-repository = "https://github.com/awsatnley/fricgan"
+repository = "https://github.com/awstanley/fricgan"
 readme = "README.md"
 categories = ["data-structures","no-std"]
 license = "MIT OR Apache-2.0"
